@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder,StandardScaler,OneHotEncoder
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
 
 
 
@@ -63,6 +65,37 @@ def missing_vs_target(dataframe, target, na_columns):
                             "Count": temp_df.groupby(col)[target].count()}), end="\n\n\n")
 
 
+def fillna_with_median_by_groups(dataframe,na_col,groups:list):
+    na_rows = dataframe.loc[dataframe[na_col].isna(),na_col].index
+    dataframe.loc[dataframe[na_col].isna(), na_col] = \
+    dataframe.groupby(groups)[na_col] \
+        .transform(lambda x: x.fillna(x.median()))[na_rows]
+
+    return na_rows
+
+def fillna_with_mean_by_groups(dataframe,na_col,groups:list):
+    na_rows = dataframe.loc[dataframe[na_col].isna(),na_col].index
+    dataframe.loc[dataframe[na_col].isna(), na_col] = \
+    dataframe.groupby(groups)[na_col] \
+        .transform(lambda x: x.fillna(x.mean()))[na_rows]
+
+    return na_rows
+
+
+def fillna_with_mode_by_groups(dataframe,na_col,groups:list):
+    na_bef = dataframe[na_col].isna().sum()
+    # Select na rows indices
+    na_rows = dataframe.loc[dataframe[na_col].isna(),na_col].index
+    # fill na values with mode by groups
+    dataframe.loc[dataframe[na_col].isna(),na_col] = \
+    dataframe.groupby(groups)[na_col].transform(lambda x: x.fillna(pd.Series.mode(x)[0]))[na_rows]
+
+    print(f'{na_col} missing values before :{na_bef}')
+    print(f'{na_col} missing values after :{dataframe[na_col].isna().sum()}')
+
+    return na_rows
+
+
 def label_encoder(dataframe,binary_col):
     labelencoder = LabelEncoder()
     dataframe[binary_col] = labelencoder.fit_transform(dataframe[binary_col])
@@ -71,6 +104,33 @@ def label_encoder(dataframe,binary_col):
 def one_hot_encoder(dataframe, categorical_cols, drop_first=False):
     dataframe = pd.get_dummies(dataframe, columns=categorical_cols, drop_first=drop_first)
     return dataframe
+
+# Scale and encode with sklearn pipelines
+def numerical_transformer(numerical_cols):
+    numerical_transformer = Pipeline(steps=[('scaler', StandardScaler())])
+    return numerical_transformer
+
+
+def categorical_transformer(categorical_cols):
+    # One-hot encode categorical data
+    categorical_transformer = Pipeline(
+        steps=[('onehot', OneHotEncoder(drop='if_binary', handle_unknown='ignore', sparse=False))])
+    return categorical_transformer
+
+
+def columns_transformer(dataframe, num_transformer, cat_transformer, numerical_cols, categorical_cols):
+    ct = ColumnTransformer(
+        transformers=[
+            ('num', numerical_transformer, numerical_cols),
+            ('cat', categorical_transformer, categorical_cols)],
+        remainder='passthrough')
+
+    return ct
+
+
+def apply_log_transfrom(dataframe,transform_cols):
+    for col in transform_cols:
+        dataframe[col] = np.log(1+dataframe[col])
 
 def cat_summary(dataframe, col_name, plot=False):
     print(pd.DataFrame({col_name: dataframe[col_name].value_counts(),
@@ -101,6 +161,8 @@ def rare_encoder(dataframe, rare_perc, cat_cols):
         dataframe[col] = np.where(dataframe[col].isin(rare_labels), 'Rare', dataframe[col])
 
     return dataframe
+
+
 
 
 

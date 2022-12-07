@@ -1,6 +1,10 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.decomposition import PCA
+import plotly.express as px
+
 
 #############################################
 # GENERAL
@@ -131,3 +135,92 @@ def pie_charts(dataframe,col):
                                 textprops = {"fontsize" : 17}).\
                                 set_title('Distribution')
     plt.show()
+
+def all_pie_charts(dataframe,categorical_cols,nrow,ncol,figsize = (10,30)):
+    fig = plt.figure(figsize=figsize)
+    for i,col in enumerate(categorical_cols):
+        # Left column
+        ax = fig.add_subplot(nrow,ncol,i+1)
+        explode = [0.1 for x in range(dataframe[col].nunique())]
+        palette_color = sns.color_palette('hls', 8)
+        sizes = dataframe[col].value_counts().values
+        labels = dataframe[col].dropna().unique()
+        plt.pie(sizes,
+                explode=explode,
+                labels=labels, colors=palette_color,
+                autopct='%1.1f%%',
+                shadow=True, startangle=90)
+        ax.set_title(col)
+
+    fig.tight_layout()
+    plt.show()
+
+    return fig
+
+
+def heatmap_missing(dataframe,figsize = (10,4)):
+    na_cols = dataframe.columns[dataframe.isna().any()].to_list()
+    plt.figure(figsize=figsize)
+    sns.heatmap(dataframe[na_cols].isna().T,cmap = "summer")
+    plt.title("heatmap of missing values")
+
+def heatmap_jointdist(dataframe,xcol,target_col,figsize=(10,4)):
+    '''
+    Plots heatmap of joint distribution of two categorical variable
+
+            Parameters:
+                    xcol (str): Categorical col in pandas dataframe
+                    target_col (str): Categorical col in pandas dataframe
+
+            Returns: Joint distribution
+    '''
+    joint_dist = dataframe.groupby([xcol, target_col]).size().unstack().fillna(0)
+    fig = plt.figure(figsize=figsize)
+    sns.heatmap(joint_dist.T, cmap="coolwarm", annot=True, fmt="g")
+
+    return joint_dist
+
+def count_plot_jointdist(dataframe,xcol,target_col,plot=True):
+    '''
+    Plots joint distribution countplot of two categorical variable
+
+            Parameters:
+                    xcol (str): Categorical col in pandas dataframe
+                    target_col (str): Categorical col in pandas dataframe
+
+            Returns: joint distribution
+    '''
+    joint_dist = dataframe.groupby([xcol,target_col])[target_col].size().unstack().fillna(0)
+    if plot:
+        sns.countplot((joint_dist > 0).sum(axis=1))
+
+    return joint_dist
+
+def plot_log_transformed(dataframe,transform_cols,nrow,ncol,figsize=(12,20)):
+    fig = plt.figure(figsize=figsize)
+    for i,col in enumerate(transform_cols):
+        #Right plot
+        plt.subplot(nrow,ncol,2*i+1)
+        sns.histplot(dataframe[col],binwidth=100)
+        plt.ylim([0, 200])
+        plt.title(f"{col} original")
+        #Left plot
+        plt.subplot(nrow,ncol,2*i+2)
+        sns.histplot(np.log(1+dataframe[col]),color = "C1")
+        plt.ylim([0, 200])
+        plt.title(f"{col} log transformed")
+
+    fig.tight_layout()
+    plt.show()
+
+def visualize_pca_3d(dataframe):
+    pca = PCA(n_components=3)
+    components = pca.fit_transform(dataframe)
+    total_var = pca.explained_variance_ratio_.sum() * 100
+    fig = px.scatter_3d(
+        components, x=0, y=1, z=2, color=y[:-1], size=0.1*np.ones(len(dataframe)), opacity = 1,
+        title=f'Total Explained Variance: {total_var:.2f}%',
+        labels={'0': 'PC 1', '1': 'PC 2', '2': 'PC 3'},
+        width=800, height=500
+        )
+    fig.show()
